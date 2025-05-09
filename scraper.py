@@ -32,7 +32,7 @@ def classify_delivery_method(text):
     return 'N/A'
 
 def scrape_enr():
-    response = requests.get('https://www.enr.com/topics/114-buildings')
+    response = requests.get('https://www.enr.com/topics/652-news')
     soup = BeautifulSoup(response.content, 'html.parser')
     articles = []
     for item in soup.find_all('div', class_='listing__content'):
