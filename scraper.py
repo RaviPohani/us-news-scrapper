@@ -1,56 +1,60 @@
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
+from datetime import datetime
 
-infra_types = {
-    'Transport': ['road', 'rail', 'airport', 'bridge', 'highway'],
-    'Energy': ['solar', 'wind', 'hydro', 'power', 'grid', 'electric'],
-    'Water': ['water', 'wastewater', 'sewage', 'pipeline'],
-    'Digital': ['fiber', 'data center', '5G', 'broadband']
-}
+# USDOT Newsroom URL
+url = 'https://www.transportation.gov/newsroom'
 
-deal_types = {
-    'M&A': ['acquire', 'acquisition', 'merger', 'buyout'],
-    'Greenfield': ['new project', 'greenfield', 'groundbreaking'],
-    'Brownfield': ['brownfield', 'redevelopment', 'upgrade'],
-    'PPP': ['PPP', 'P3', 'public-private partnership']
-}
+response = requests.get(url)
+soup = BeautifulSoup(response.text, 'html.parser')
 
-delivery_methods = ['DBFOM', 'EPC', 'Lease', 'O&M']
+# List to store news
+articles = []
 
-def classify_category(text, categories):
-    for category, keywords in categories.items():
-        for kw in keywords:
-            if kw.lower() in text.lower():
-                return category
-    return 'Uncategorized'
-
-def classify_delivery_method(text):
-    for method in delivery_methods:
-        if method.lower() in text.lower():
-            return method
-    return 'N/A'
-
-def scrape_enr():
-    response = requests.get('https://www.enr.com/topics/652-news')
-    soup = BeautifulSoup(response.content, 'html.parser')
-    articles = []
-    for item in soup.find_all('div', class_='listing__content'):
-        title_tag = item.find('a', class_='listing__title')
-        date_tag = item.find('div', class_='listing__date')
-        if title_tag and date_tag:
+# Loop through news article listings
+for row in soup.find_all('div', class_='views-row'):
+    try:
+        title_tag = row.find('h3')
+        if title_tag:
             title = title_tag.text.strip()
-            link = 'https://www.enr.com' + title_tag['href']
-            date = date_tag.text.strip()
-            infra_type = classify_category(title, infra_types)
-            deal_type = classify_category(title, deal_types)
-            delivery_method = classify_delivery_method(title)
-            articles.append({
-                'Date of Article': date,
-                'Infrastructure Type': infra_type,
-                'Deal Type': deal_type,
-                'Infrastructure Delivery Method': delivery_method,
-                'Title of article': title,
-                'Link of article': link
-            })
-    return pd.DataFrame(articles)
+            link = 'https://www.transportation.gov' + title_tag.find('a')['href']
+        else:
+            continue
+
+        # Extract date
+        date_tag = row.find('span', class_='date-display-single')
+        date = date_tag.text.strip() if date_tag else datetime.now().strftime('%Y-%m-%d')
+
+        # Classify infrastructure type based on keywords
+        if 'aviation' in title.lower() or 'airport' in title.lower():
+            infra_type = 'Aviation'
+        elif 'rail' in title.lower() or 'amtrak' in title.lower():
+            infra_type = 'Rail'
+        elif 'highway' in title.lower() or 'bridge' in title.lower():
+            infra_type = 'Road/Bridge'
+        elif 'port' in title.lower() or 'maritime' in title.lower():
+            infra_type = 'Port/Maritime'
+        else:
+            infra_type = 'General Transport'
+
+        deal_type = 'Announcement'
+        delivery_method = 'Public Funding'
+
+        articles.append({
+            'Date of Article': date,
+            'Infrastructure Type': infra_type,
+            'Deal Type': deal_type,
+            'Infrastructure Delivery Method': delivery_method,
+            'Title of Article': title,
+            'Link of Article': link
+        })
+    except Exception as e:
+        print(e)
+
+# Convert to DataFrame
+df = pd.DataFrame(articles)
+
+# Export to Excel
+df.to_excel('usdot_infra_news.xlsx', index=False)
+print("✅ Data exported to 'usdot_infra_news.xlsx'")
